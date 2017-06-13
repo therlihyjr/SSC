@@ -7,6 +7,8 @@ package week04;
  * @author Tim Herlihy Jr.
  */
 
+//this is a comment
+
 public class WordCountResult {
 
 	private String m_word; 	/** word to count */

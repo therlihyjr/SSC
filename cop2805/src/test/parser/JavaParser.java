@@ -34,10 +34,12 @@ public class JavaParser
 		m_visibilityStack = new Stack<String>();
 		m_parameterStack = new Stack<String>();
 	}
-	
+
 	/**
 	 * Suppress the trace output
-	 * @param suppress true to suppress, false to display
+	 * 
+	 * @param suppress
+	 *            true to suppress, false to display
 	 */
 	public void suppressTrace(boolean suppress)
 	{
@@ -141,7 +143,7 @@ public class JavaParser
 
 		String commentStart = tokenizer.toString();
 
-		while((ch = (char)reader.read()) != -1 && !fDone)
+		while(!fDone && (ch = (char)reader.read()) != -1)
 		{
 			if(ch == '*' || ch == '/') // comment start characters
 			{
@@ -195,30 +197,19 @@ public class JavaParser
 		StringBuilder commentContent = new StringBuilder();
 		commentContent.append(commentStart);
 
-		StringBuilder commentBuilder = new StringBuilder();
-		String endComment = "";
-
 		char ch = (char)-1;
 
+		TwoCharString endCommentPair = new TwoCharString();
+				
 		while((ch = (char)reader.read()) != -1)
 		{
-			if(ch == '*')
+			// keep track of the last two characters so we can look for */
+			endCommentPair.addChar(ch);
+
+			if( endCommentPair.toString().equals("*/"))
 			{
-				commentContent.append(ch); // comment body
-
-				commentBuilder = new StringBuilder();
-				commentBuilder.append(ch); // end of comment
-
-				char nextChar = (char)reader.read();
-				// m_content += nextChar;
-				commentBuilder.append(nextChar);
-				commentContent.append(nextChar); // comment body
-
-				endComment = commentBuilder.toString();
-				if(endComment.equals("*/"))
-				{
-					break;
-				}
+				commentContent.append(ch);
+				break;
 			}
 			else
 			{
@@ -314,6 +305,26 @@ public class JavaParser
 		else if(token.equals("class"))
 		{
 			// getClassToken
+			switch(m_curState)
+			{
+				case SCANNNING: // haven't started processing main class yet
+					
+					ClassToken classToken = getClassToken(reader);
+					processClassBody(classToken, reader);
+					break;
+					
+				case CLASSBODY: 	// encountered an embedded class
+					// eat embedded classes
+					eatEmbeddedClass(reader);
+					break;
+					
+				case METHODBODY:
+					break;
+			}
+		}
+		else if(token.equals("interface"))
+		{
+			// getClassToken
 			ClassToken classToken = getClassToken(reader);
 			processClassBody(classToken, reader);
 		}
@@ -346,6 +357,25 @@ public class JavaParser
 		}
 	}
 
+	private void eatEmbeddedClass(BufferedReader reader) throws IOException
+	{
+		char ch = 0x0;
+		int value = -1;
+		
+		while((value = reader.read()) != -1)
+		{
+			ch = (char)value;
+			if(!isWhitespace(ch))
+			{
+				if(ch == '{')
+				{
+					eatBody(reader);
+				}
+			}
+		}
+		
+	}
+
 	private void processEnumBody(ClassToken classToken, BufferedReader reader)
 			throws IOException
 	{
@@ -355,7 +385,7 @@ public class JavaParser
 		StringBuilder tokenizer = new StringBuilder();
 		// m_curState = STATE.CLASSBODY;
 
-		while((value = reader.read()) != -1 && !fDone)
+		while(!fDone && (value = reader.read()) != -1)
 		{
 			ch = (char)value;
 			if(!isWhitespace(ch))
@@ -507,10 +537,12 @@ public class JavaParser
 					ParameterToken paramToken = new ParameterToken(type, param);
 					paramList.add(paramToken);
 				}
-				
-				String visibility = m_visibilityStack.size() > 0 ? m_visibilityStack.pop() : "";
+
+				String visibility = m_visibilityStack.size() > 0
+						? m_visibilityStack.pop() : "";
 				ConstructorToken cToken = new ConstructorToken(constructorName,
 						m_currentCommentToken, visibility, paramList);
+				trace("Adding constructor: " + cToken.getName());
 				m_fileToken.getClassToken().addConstructor(cToken);
 				break;
 			}
@@ -557,7 +589,7 @@ public class JavaParser
 		int value = -1;
 		boolean fDone = false;
 		StringBuilder tokenizer = new StringBuilder();
-		while((value = reader.read()) != -1 && !fDone)
+		while(!fDone && (value = reader.read()) != -1)
 		{
 			ch = (char)value;
 			if(!isWhitespace(ch))
@@ -589,6 +621,7 @@ public class JavaParser
 				else if(ch == '}')
 				{
 					// body close brace
+					m_curState = STATE.SCANNNING;
 					fDone = true;
 				}
 				else if(ch == '"')
@@ -617,11 +650,16 @@ public class JavaParser
 
 					if(tokenInfo.lastChar == '(')
 					{
-						if(tokenInfo.token.equals(
+						if(tokenInfo.token.startsWith("@"))
+						{
+							// eat it
+							eatAttribute(reader);
+						}
+						else if(tokenInfo.token.equals(
 								m_fileToken.getClassToken().getClassName()))
 						{
 							processConstructor(tokenInfo.token, reader);
-						}
+						}						
 						else
 						{
 							processMethod(tokenInfo.token, reader);
@@ -646,6 +684,24 @@ public class JavaParser
 		}
 	}
 
+	private void eatAttribute(BufferedReader reader) throws IOException
+	{
+		int value = -1;
+		TwoCharString eol = new TwoCharString();
+		
+		while((value = reader.read()) != -1)
+		{
+			char ch = (char)value;
+			eol.addChar(ch);
+			if(System.lineSeparator().equals(eol.toString()) || // microsoft \r\n
+			   System.lineSeparator().equals(ch)) 				// unix/linux \n
+			{
+				break;
+			}
+		}
+		
+	}
+
 	private void getAssignmentToken(StringBuilder tokenizer,
 			BufferedReader reader) throws IOException
 	{
@@ -654,8 +710,8 @@ public class JavaParser
 		while(!fDone)
 		{
 			ch = (char)reader.read();
-			if( ch == '"') // closing quote
-			{				
+			if(ch == '"') // closing quote
+			{
 				tokenizer.append(ch);
 				getStringToken(tokenizer, reader);
 			}
@@ -668,18 +724,19 @@ public class JavaParser
 			{
 				tokenizer.append(ch);
 			}
-		}	
-		
+		}
+
 	}
 
-	private void getStringToken(StringBuilder tokenizer, BufferedReader reader) throws IOException
+	private void getStringToken(StringBuilder tokenizer, BufferedReader reader)
+			throws IOException
 	{
 		char ch = (char)-1;
 		boolean fDone = false;
 		while(!fDone)
 		{
 			ch = (char)reader.read();
-			if( ch == '"') // closing quote
+			if(ch == '"') // closing quote
 			{
 				fDone = true;
 				tokenizer.append(ch); // append closing quote
@@ -688,7 +745,7 @@ public class JavaParser
 			{
 				tokenizer.append(ch);
 			}
-		}		
+		}
 	}
 
 	private void processMethod(String token, BufferedReader reader)
@@ -766,6 +823,7 @@ public class JavaParser
 					cToken.setAbstract();
 				if(isStatic)
 					cToken.setStatic();
+				trace("  -- Adding method: " + cToken.getName());
 				m_fileToken.getClassToken().addMethod(cToken);
 				break;
 			}
@@ -832,8 +890,28 @@ public class JavaParser
 		CommentToken commentToken = m_currentCommentToken == null
 				? new CommentToken("") : m_currentCommentToken;
 		StringBuilder tokenizer = new StringBuilder();
-		String className = getToken(tokenizer, reader).token;
+		TokenInfo tokenInfo = getToken(tokenizer, reader);
+		String className = tokenInfo.token;
 		ClassToken classToken = new ClassToken(className, commentToken);
+
+		if(tokenInfo.lastChar == '{')
+		{
+			// need to possibly change processing state
+			switch(m_curState)
+			{
+				case SCANNNING:
+					m_curState = STATE.CLASSBODY;
+					m_visibilityStack.clear();
+					eatEnum(reader); // normally enumeration settings
+										// are first
+					break;
+				case CLASSBODY:
+					eatBody(reader);
+					break;
+				case METHODBODY:
+					break;
+			}
+		}
 		while(!m_visibilityStack.isEmpty())
 		{
 			String value = m_visibilityStack.pop();
@@ -1092,4 +1170,50 @@ class TokenInfo
 
 	String token;
 	char lastChar;
+}
+
+/**
+ * Manages a two character string. When a character is added, the right position
+ * shifts to the left and the new character takes the right position Example:
+ * 
+ * Original op Add r Update: pr
+ * 
+ * @author Scott LaChance
+ */
+class TwoCharString
+{
+	TwoCharString()
+	{
+		m_chars = new char[2];
+		m_length = 0;
+	}
+
+	public void addChar(char ch)
+	{
+		switch(m_length)
+		{
+			case 0:
+				m_chars[0] = ch;
+				m_length = 1;
+				break;
+			case 1:
+				m_chars[1] = ch;
+				m_length = 2;
+				break;
+			case 2:
+				m_chars[0] = m_chars[1];
+				m_chars[1] = ch;
+				break;
+		}
+	}
+
+	@Override
+	public String toString()
+	{
+		// TODO Auto-generated method stub
+		return new String(m_chars);
+	}
+
+	private char[] m_chars;
+	private int m_length = 0;
 }

@@ -17,6 +17,7 @@ import test.TestResult;
 import test.parser.JavaParser;
 import test.parser.tokens.ClassToken;
 import test.parser.tokens.CommentToken;
+import test.parser.tokens.CommentToken.ParameterInfo;
 import test.parser.tokens.ConstructorToken;
 import test.parser.tokens.FileToken;
 import test.parser.tokens.FunctionToken;
@@ -110,6 +111,7 @@ public class JUnitJavadocValidationUtility
 		}
 
 		m_testResult.setResult(result);
+		trace("Completed running " + getTestName());
 		return m_testResult;
 	}
 
@@ -168,7 +170,7 @@ public class JUnitJavadocValidationUtility
 					parser.suppressTrace(m_suppressParserTrace);
 					FileToken fileToken = parser.parse(srcFile);
 
-					trace("evaluating ... ");
+					trace("** evaluating ... ");
 					try
 					{
 						result = evaluateFileToken(fileToken, file);
@@ -178,6 +180,7 @@ public class JUnitJavadocValidationUtility
 						trace(" -- error evaluating: " + ex.getMessage());
 						result = false;
 					}
+					trace("** evaluating complete ");
 				}
 			}
 		}
@@ -313,7 +316,7 @@ public class JUnitJavadocValidationUtility
 		boolean hasAuthor = true;
 		if(!fileToken.hasAuthor())
 		{
-			String msg = "    -- " + MISSING_AUTHOR_TAG + CRLF;
+			String msg = "    -- " + fileToken.getClassToken().getClassName() + " comment " + MISSING_AUTHOR_TAG + CRLF;
 			updateResultStatus("class comment validation", msg);
 			hasAuthor = false;
 		}
@@ -331,7 +334,7 @@ public class JUnitJavadocValidationUtility
 		if(!correctPackage)
 		{
 			String msg = String.format(
-					"    -- Package mismatch - expected: %s, actual: %s",
+					"    -- " + "class " + fileToken.getClassToken().getClassName() + " Package mismatch - expected: %s, actual: %s",
 					expectedPackageName, actualPackageName) + CRLF;
 			updateResultStatus("package validation", msg);
 		}
@@ -365,7 +368,7 @@ public class JUnitJavadocValidationUtility
 						.equals(expectedMethod.getVisibility());
 				boolean returnTypeMatch = methodToken.getReturnType()
 						.equals(expectedMethod.getReturnType());
-				boolean validComment = verifyMethodComment(methodToken);
+				boolean validComment = verifyMethodComment(classToken, methodToken);
 				boolean parameterCountMatch = methodToken
 						.getParameterCount() == expectedMethod
 								.getParameterCount();
@@ -419,8 +422,8 @@ public class JUnitJavadocValidationUtility
 			else
 			{
 				// no name match
-				String msg = String.format("    -- ** Missing method - %s **",
-						expectedMethod.getMethodName());
+				String msg = String.format("    -- ** %s: Missing method - %s **",
+						fileToken.getClassToken().getClassName(), expectedMethod.getMethodName());
 				updateResultStatus("method validation", msg);
 				methodsMatch = false;
 			}
@@ -473,7 +476,7 @@ public class JUnitJavadocValidationUtility
 					isValid = isValid && visbilityMatch;
 
 					// TODOD
-					boolean validComment = verifyMethodComment(
+					boolean validComment = verifyMethodComment(fileToken.getClassToken(),
 							constructorToken);
 
 					isValid = isValid && validComment;
@@ -504,6 +507,7 @@ public class JUnitJavadocValidationUtility
 		JavadocTestResultDetail detail = new JavadocTestResultDetail(
 				description);
 		detail.addResultDetail(msg);
+//		trace("   -- updateResultStatus " + msg);
 		m_testResult.addTestResultDetail(detail);
 	}
 
@@ -526,49 +530,74 @@ public class JUnitJavadocValidationUtility
 		return match;
 	}
 
-	private boolean validateParamerters(FunctionToken token,
-			List<ParameterToken> parameterList)
+	/**
+	 * Verifying the parameters of the function match the parameters 
+	 * of the comment
+	 * @param classToken 
+	 * @param token
+	 * @param parameterList
+	 * @return
+	 */
+	private boolean validateParamerters(ClassToken classToken, FunctionToken token)//,
+			//List<ParameterToken> parameterList)
 	{
 		boolean validParams = true;
+		boolean foundParam = true;
 		StringBuilder msg = new StringBuilder();
 
 		CommentToken comment = token.getComment();
 		String javadoc = comment.getJavadoc();
+		// method parameters
+		List<ParameterToken> parameterList = token.getParameters();
 		int expectedCount = parameterList.size();
 		int actualCount = token.getParameterCount();
 		boolean parameterCountMatch = expectedCount == actualCount;
 
+		String name = token.getName();
 		if(!parameterCountMatch)
 		{
 			msg.append(String.format(
-					"    -- Parameter count mismatch - expected: %d, actual: %d",
-					expectedCount, actualCount));
+					"    -- %s: s %s Parameter count mismatch - expected: %d, actual: %d",
+					classToken.getClassName(), name, expectedCount, actualCount));
 			msg.append(CRLF);
 		}
 
 		for(ParameterToken param : parameterList)
 		{
-			String paramName = param.getName();
-			String lookFor = "@param " + paramName;
-			// trace(token.getName() + " param type: " + param.getType() + ",
-			// param name: " + param.getName());
-			boolean foundParam = javadoc.contains(lookFor);
+			// see if the method parameter is in the comment parameters
+			// must be an exact match
+			foundParam = findParameterMatchInComment(param.getName(), comment);
 			if(!foundParam)
 			{
 				String errMsg = String.format(
-						"Expected @param missing from %s: param %s",
-						token.getName(), paramName);
+						"  -- %s: Expected @param missing from %s: param %s",
+						classToken.getClassName(), token.getName(), param.getName());
 				msg.append(errMsg);
-				updateResultStatus("constructor parameter validation", errMsg);
+				updateResultStatus("parameter validation", errMsg);
 
 			}
-			validParams = validParams && foundParam;
+			validParams = validParams && foundParam;			
 		}
 
 		return validParams;
 	}
 
-	private boolean validateReturnType(MethodToken token)
+	private boolean findParameterMatchInComment(String methodParameterName, CommentToken commentToken)
+	{
+		boolean result = false;
+		
+		for(ParameterInfo commentParameterInfo : commentToken.getParameters())
+		{
+			if(methodParameterName.equals(commentParameterInfo.m_name))
+			{
+				result = true;
+			}
+		}
+		
+		return result;
+	}
+	
+	private boolean validateReturnType(ClassToken classToken, MethodToken token)
 	{
 		boolean validReturn = true;
 
@@ -583,8 +612,8 @@ public class JUnitJavadocValidationUtility
 			if(!foundReturn)
 			{
 				String msg = String.format(
-						"   -- ** Expected @return missing from method %s **",
-						token.getName());
+						"   -- ** %s: Expected @return missing from method %s **",
+						classToken.getClassName(), token.getName());
 				updateResultStatus("method param validation", msg);
 			}
 			validReturn = validReturn && foundReturn;
@@ -593,7 +622,7 @@ public class JUnitJavadocValidationUtility
 		return validReturn;
 	}
 
-	private boolean verifyMethodComment(FunctionToken token)
+	private boolean verifyMethodComment(ClassToken classToken, FunctionToken token)
 	{
 		boolean hasCommentTest = false;
 		boolean validParams = false;
@@ -605,48 +634,60 @@ public class JUnitJavadocValidationUtility
 		CommentToken comment = token.getComment();
 		if(comment != null)
 		{
-			validComment = validateComment(token.getName(), comment);
+			validComment = validateComment(classToken, token.getName(), comment);
 			String javadoc = comment.getJavadoc();
 			List<ParameterToken> parameterList = token.getParameters();
 
 			hasCommentTest = javadoc.length() > 0;
-			validParams = validateParamerters(token, parameterList);
+			validParams = validateParamerters(classToken, token);//, parameterList);
 
 			if(token instanceof MethodToken)
 			{
 				MethodToken mToken = (MethodToken)token;
-				validReturn = validateReturnType(mToken);
+				validReturn = validateReturnType(classToken, mToken);
 			}
 		}
 		else
 		{
-			String msg = "   -- missing method comment for " + token.getName();
+			String msg = String.format("   -- %s: missing method comment for %s",classToken.getClassName(), token.getName());
 			updateResultStatus("comment validation", msg);
 		}
 
-		return hasCommentTest && validParams && validReturn;
+		return hasCommentTest && validParams && validReturn && validComment;
 	}
 
-	private boolean validateComment(String parentName, CommentToken comment)
+	private boolean validateComment(ClassToken classToken, String parentName, CommentToken comment)
 	{
 		boolean hasDescription = comment.getDescription().length() > 0 ? true : false;
 		boolean validReturn = true;
 		boolean validAuthor = true;
+		boolean parameterDescriptions = true;
 		
+		// Check that the identified parameters have descriptions
 		for(CommentToken.ParameterInfo info : comment.getParameters() )
 		{
 			if(info.m_description.length() == 0)
 			{
-				String msg = "   -- ** " + parentName + ": parameter '" + info.m_name + "' has no description **";
+				String msg = String.format( "   -- ** %s: %s  parameter '%s' has no description **", classToken.getClassName(), parentName, info.m_name);
+				//trace(msg);
 				updateResultStatus("comment validation", msg);
+				parameterDescriptions = false;
 			}
+		}
+		
+		if( !hasDescription )
+		{
+			//String msg = "   -- ** " + parentName + ": method/constructor has no description **";
+			String msg = String.format( "   -- ** %s: %s  method/constructor has no description **", classToken.getClassName(), parentName);
+			updateResultStatus("comment validation", msg);
 		}
 		
 		if(comment.hasReturn())
 		{
 			if(comment.getReturn().length() == 0)
 			{
-				String msg = "   -- ** " + parentName + ": @return has no description **";
+				//String msg = "   -- ** " + parentName + ": @return has no description **";
+				String msg = String.format( "   -- ** %s: %s  @return has no description **", classToken.getClassName(), parentName);
 				updateResultStatus("comment validation", msg);
 				validReturn = false;
 			}
@@ -656,13 +697,16 @@ public class JUnitJavadocValidationUtility
 		{
 			if(comment.getAuthor().length() == 0)
 			{
-				String msg = "   -- ** " + parentName + ": @author has no description **";
+				//String msg = "   -- ** " + parentName + ": @author has no description **";
+				String msg = String.format( "   -- ** %s: %s  @author has no description **", classToken.getClassName(), parentName);
 				updateResultStatus("comment validation", msg);
 				validAuthor = false;
 			}
 		}
 		
-		return hasDescription && validReturn && validAuthor;
+		boolean result = hasDescription && validReturn && validAuthor && parameterDescriptions;
+
+		return result;
 	}
 
 	private boolean verifyClassComment(CommentToken comment,
@@ -702,44 +746,5 @@ public class JUnitJavadocValidationUtility
 	private static String INVALID_MAIN = " ** Code has unexpected void main method";
 }
 
-//class ParserContext
-//{
-//	ParserContext(String fileName, int curPos, StringBuilder content)
-//	{
-//		m_fileName = fileName;
-//		m_curPos = curPos;
-//		m_content = content;
-//	}
-//
-//	public String getFileName()
-//	{
-//		return m_fileName;
-//	}
-//
-//	public int getCurPos()
-//	{
-//		return m_curPos;
-//	}
-//
-//	/**
-//	 * Update the current position as we move along
-//	 * 
-//	 * @param newPos
-//	 *            new current position
-//	 */
-//	public void setCurPosition(int newPos)
-//	{
-//		m_curPos = newPos;
-//	}
-//
-//	public StringBuilder getContent()
-//	{
-//		return m_content;
-//	}
-//
-//	String m_fileName;
-//	StringBuilder m_content;
-//	int m_curPos = 0; // analysis character position
-//}
 
 

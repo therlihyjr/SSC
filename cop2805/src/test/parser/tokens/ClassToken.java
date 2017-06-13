@@ -197,7 +197,7 @@ public class ClassToken
 		}
 
 		String msg = String.format(fmt, m_className, m_visibility, m_isAbstract,
-				m_isStatic, m_comment.toString(), methodList, constructorList);
+				m_isStatic, m_comment.toString(), constructorList, methodList );
 		return msg;
 	}
 

@@ -1,6 +1,7 @@
 package test.parser.tokens;
 
 import java.io.CharArrayReader;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -146,22 +147,6 @@ public class CommentToken
 		// get the @param
 		int paramIndex = 0;
 		paramIndex = m_javadoc.indexOf("@param", paramIndex);
-
-//		while(paramIndex != -1)
-//		{
-//			// has param get Name
-//			int eolIndex = m_javadoc.indexOf("\n", paramIndex);
-//			if(authorIndex + "@param".length() < eolIndex)
-//			{
-//				String paramName = m_javadoc
-//						.substring(authorIndex + "@param".length(), eolIndex)
-//						.trim();
-//				m_params.add(paramName);
-//			}
-//
-//			// see if there is another @param
-//			paramIndex = m_javadoc.indexOf("@param", paramIndex + 1);
-//		}
 
 		// @return
 		int returnIndex = m_javadoc.indexOf("@return");
@@ -387,7 +372,7 @@ public class CommentToken
 		return token;
 	}
 
-	private String getToken(Reader reader) throws IOException
+	private String getToken(Reader reader) throws IOException//, EOFException
 	{
 		String token = "";
 		StringBuilder tokenizer = new StringBuilder();
@@ -402,17 +387,32 @@ public class CommentToken
 			{
 				// end of token
 				break;
-			}		
+			}	
+			else if(tokenizer.toString().equals("/**"))
+			{
+				// found opening comment
+				break;
+			}
 			else
 			{
 				tokenizer.append(ch);
 			}
 		}
+//		if( value == -1 )
+//		{
+//			trace("  -- ** PROCESSING PAST END OF FILE");
+//			throw new EOFException("PROCESSING PAST END OF FILE");
+//		}
 		
 
 		token = tokenizer.toString();
 		
 		return token;
+	}
+	
+	private void trace(String msg)
+	{
+		System.out.println(msg);
 	}
 	
 	private boolean isEndofLine(char ch)
@@ -433,7 +433,7 @@ public class CommentToken
 	}
 	
 	private String m_javadoc;
-	private String m_description;
+	private String m_description = "";
 	private List<ParameterInfo> m_params;
 	private String m_author;
 	private String m_return;
