@@ -5,29 +5,35 @@ package week06;
  * @author Tim Herlihy Jr. 
  */
 
-public class InsertionSort {
-
+public class InsertionSort extends AbstractSort 
+{
+	
 	/**
-	 * Straight from the book.
-	 * @param list
+	 * Class Constructor to Abstract
+	 * @param list  primary list of integers
 	 */
-	public InsertionSort(int[] list)
-	{
-		for (int i = 1; i < list.length; i++) 
-		{
-			int currentElement = list[i];
-			int k;
-			for (k = i - 1; k >= 0 && list[k] > currentElement; k--)
-			{
-				list[k+1] = list[k];
-			}
-			
-			list [k+1] = currentElement;
-		}
+	public InsertionSort(int[] list) {
+		super("InsertionSort", list);
 	}
 	
+	/**
+	 * Method to be called by abstract class for sorting
+	 */
 	public void sort()
 	{
-		
+		{
+			for (int i = 0; i < getList().length; i++) 
+			{
+			int[] currentList = getList();	
+			int currentElement = currentList[i];
+			int k;
+				for (k = i - 1; k >= 0 && currentList[k] > currentElement; k--)
+				{
+					currentList[k+1] = currentList[k];
+				}
+			currentList [k + 1] = currentElement;
+			}
+		}
 	}
-}
+}	
+

@@ -39,9 +39,12 @@ public class TestCaseSorting
         // Make copies of the test data so we can compare them afterward
         // Remember, the array list gets passed by reference
         int[] insertionList = Arrays.copyOf(testList, testList.length);
+        System.out.println("Insertion List");
         int[] selectionList = Arrays.copyOf(testList, testList.length);
+        System.out.println("Selection List");
         int[] mergeList = Arrays.copyOf(testList, testList.length);
-
+        System.out.println("Merge List");
+        
         InsertionSort insertion = new InsertionSort(insertionList);
         SelectionSort selection = new SelectionSort(selectionList);
         MergeSort merge = new MergeSort(mergeList);
@@ -72,7 +75,7 @@ public class TestCaseSorting
 		}
 	}
 
-	private boolean verifySorts(int[] a, int[] b, int[] c)
+	private boolean verifySorts(int[] a, int[] b, int[] c) 
     {
         boolean result = true;
 
@@ -83,6 +86,12 @@ public class TestCaseSorting
             String msg = String
                     .format("Lengths different; insertion = %d, selection = %d, merge = %d", 
                             a.length, b.length, c.length);
+            try {
+				Thread.sleep(4000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
             trace(msg);            
         }
         else
@@ -95,6 +104,7 @@ public class TestCaseSorting
                     String msg = String
                             .format("Mismatched value at index %d; insertion = %d, selection = %d, merge = %d", 
                                     i, a[i], b[i], c[i]);
+                    
                     trace(msg);                  
                     result = false;                    
                     break; // early out
@@ -105,10 +115,10 @@ public class TestCaseSorting
         return result;
     }
 
-    private static int[] getTestList()
+    static int[] getTestList()
     {
         Random rand = new Random();
-        int size = 100000;
+        int size = 1000;
         int[] list = new int[size];
 
         for(int i = 0; i < size; i++)
