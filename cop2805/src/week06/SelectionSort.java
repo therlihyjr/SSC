@@ -13,7 +13,6 @@ public class SelectionSort extends AbstractSort {
 	 */
 	public SelectionSort(int[] list) {
 		super("SelectionSort", list);
-		// TODO Auto-generated constructor stub
 	}
 	
 	/**
@@ -25,17 +24,14 @@ public class SelectionSort extends AbstractSort {
 		
 		for (int i = 0; i < list.length -1; i++) 
 		{
-			int currentMin = list[i];
-			int currentMinIndex = i;
-			
+			int index = i;
 			for (int j = i + 1; j < list.length; j++) 
 			{
-				if (currentMin > list[j] )
+				if (list[j] < list[index] )
 				{
-					currentMinIndex = list[j];
-					currentMinIndex = j;
+					swap(list,j,index);
 				}	
-				swap(list,currentMin, currentMinIndex);
+				
 			}
 		}
 	}
@@ -46,12 +42,10 @@ public class SelectionSort extends AbstractSort {
 	 * @param index; index of list
 	 * @param i; loop index
 	 */
-	private void swap(int[] list, int currentMin, int currentMinIndex)
+	private void swap(int[] list, int j, int index)
 	{
-		if (currentMinIndex != currentMinIndex)
-		{
-		list[currentMinIndex] = list[i];
-		list[i] = currentMin;
-		}
+		int pHolder = list[j];
+		list[j] = list[index];
+		list[index] = pHolder;
 	}	
 }
