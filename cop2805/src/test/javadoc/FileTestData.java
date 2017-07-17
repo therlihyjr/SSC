@@ -20,10 +20,6 @@ public class FileTestData
 	 */
 	public FileTestData(String packageName, String fileName, List<MethodTestData> methods)
 	{
-//		m_packageName = packageName;
-//		m_fileName = fileName;
-//		m_methods = methods;
-//		mapMethods();
 		this(packageName, fileName, methods, new ArrayList<ConstructorTestData>());
 	}
 	

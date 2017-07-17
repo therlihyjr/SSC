@@ -1,0 +1,11 @@
+
+
+You should not be reinitializing the entire JList widget just to remove some items from it. Instead you should be manipulating the lists model, since changes to it are 'automatically' synchronized back to the UI. Assuming that you are indeed using the DefaultListModel, this is sufficient to implement your 'Clear All' functionality:
+
+private void jButtonClearActionPerfomed(java.awt.event.ActionEvent evt) {
+    if(evt.getSource()==jButtonClear) {
+        DefaultListModel listModel = (DefaultListModel) jList1.getModel();
+        listModel.removeAllElements();
+    }
+}
+

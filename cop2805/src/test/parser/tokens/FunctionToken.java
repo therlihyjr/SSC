@@ -11,14 +11,44 @@ public abstract class FunctionToken extends Token
 		m_parameters = parameters;
 	}
 
+	/**
+	 * Return the paraemter list
+	 * @return List of ParameterTokens
+	 */
 	public List<ParameterToken> getParameters()
 	{
 		return m_parameters;
 	}
 
+	/**
+	 * Get the number of parameters
+	 * @return number of parameters
+	 */
 	public int getParameterCount()
 	{
 		return m_parameters.size();
+	}
+
+	/**
+	 * Get the number of parameters
+	 * @return number of parameters
+	 */
+	public String getParameterTypes()
+	{
+		String types = "";
+//		for(ParameterToken pToken : m_parameters)
+//		{
+//			types += pToken.getType();
+//		}
+		
+		ParameterToken[] parameters = m_parameters.toArray(new ParameterToken[0]);
+
+		for(int i = parameters.length -1; i >= 0; i--)
+		{
+			types+=parameters[i].getType();
+		}
+		
+		return types;
 	}
 
 	@Override

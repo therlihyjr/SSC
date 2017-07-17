@@ -168,12 +168,14 @@ public class CommentToken
 	{
 		String curToken = "";
 		String retToken = "";
+		TokenInfo tokenInfo = null;
 		
 		boolean fDone = false;
 				
 		while(!fDone)
 		{
-			curToken = getToken(reader);
+			tokenInfo = getToken(reader);
+			curToken = tokenInfo.getToken();
 			retToken = processToken(curToken, reader);
 			if( retToken.equals("*/") ||
 				retToken.equals(""))
@@ -220,9 +222,11 @@ public class CommentToken
 		boolean fDone = false;
 		StringBuilder comment = new StringBuilder();
 		String token = "";
+		TokenInfo tokenInfo = null;
 		while(!fDone)
 		{
-			token = getToken(reader);
+			tokenInfo = getToken(reader);
+			token = tokenInfo.getToken();
 			
 			if(token.equals("@param") ||
 			   token.equals("@return") ||
@@ -256,9 +260,11 @@ public class CommentToken
 		boolean fDone = false;
 		StringBuilder comment = new StringBuilder();
 		String token = "";
+		TokenInfo tokenInfo = null;
 		while(!fDone)
 		{
-			token = getToken(reader);
+			tokenInfo = getToken(reader);
+			token = tokenInfo.getToken();
 			
 			if(token.equals("@param") ||
 			   token.equals("@return") ||
@@ -292,10 +298,11 @@ public class CommentToken
 		String token = "";
 		StringBuilder tokenizer = new StringBuilder();
 		boolean fDone = false;
-		
+		TokenInfo tokenInfo = null;
 		while(!fDone)
 		{
-			token = getToken(reader);
+			tokenInfo = getToken(reader);
+			token = tokenInfo.getToken();
 			if(token.equals("@param") 		||
 			   token.equals("@return")		||
 			   token.equals("@exception") 	||
@@ -332,10 +339,20 @@ public class CommentToken
 		String paramDescription = "";
 		StringBuilder tokenizer = new StringBuilder();
 		boolean fDone = false;
+		TokenInfo tokenInfo = null;
+		TwoCharString twoChar = new TwoCharString();
+		char lastChar = '\0';
 		
 		while(!fDone)
-		{
-			token = getToken(reader);
+		{			
+			tokenInfo = getToken(reader);
+			token = tokenInfo.getToken();
+			lastChar = tokenInfo.getChar();
+			twoChar.addChar(lastChar);
+			if(lastChar == '*')
+			{
+				trace("got a * during atParam processing");
+			}
 			if(token.equals("@param") 		||
 			   token.equals("@return")		||
 			   token.equals("@exception") 	||
@@ -353,6 +370,14 @@ public class CommentToken
 			}
 			else
 			{
+				if(token.endsWith("*/"))
+				{
+					// trim the token
+					int index = token.indexOf("*/");
+					token = token.substring(0, index);
+					fDone = true;
+				}
+				
 				if(gotParamName)
 				{
 					tokenizer.append(token);
@@ -372,17 +397,19 @@ public class CommentToken
 		return token;
 	}
 
-	private String getToken(Reader reader) throws IOException//, EOFException
+	private TokenInfo getToken(Reader reader) throws IOException
 	{
 		String token = "";
 		StringBuilder tokenizer = new StringBuilder();
 		char ch = 0x0;
 		int value = -1;
 
+		TwoCharString twoChar = new TwoCharString();
+		
 		while(((value = reader.read()) != -1))
 		{
 			ch = (char)value;
-			
+			twoChar.addChar(ch);
 			if(isWhitespace(ch))
 			{
 				// end of token
@@ -393,21 +420,28 @@ public class CommentToken
 				// found opening comment
 				break;
 			}
+			else if(twoChar.toString().equals("*/"))
+			{
+				// found a comment close characters	
+				tokenizer.append(ch);
+				int size = tokenizer.toString().length();
+				if( size > 2)
+				{
+					tokenizer.delete(0, size - 2);
+				}
+				
+				//tokenizer.delete(0, 1);
+				break;
+			}
 			else
 			{
 				tokenizer.append(ch);
 			}
-		}
-//		if( value == -1 )
-//		{
-//			trace("  -- ** PROCESSING PAST END OF FILE");
-//			throw new EOFException("PROCESSING PAST END OF FILE");
-//		}
-		
+		}		
 
 		token = tokenizer.toString();
 		
-		return token;
+		return new TokenInfo(token,ch);
 	}
 	
 	private void trace(String msg)

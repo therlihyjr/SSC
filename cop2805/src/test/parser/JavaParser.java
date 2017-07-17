@@ -17,6 +17,8 @@ import test.parser.tokens.MethodToken;
 import test.parser.tokens.OverrideToken;
 import test.parser.tokens.PackageToken;
 import test.parser.tokens.ParameterToken;
+import test.parser.tokens.TokenInfo;
+import test.parser.tokens.TwoCharString;
 
 /**
  * Parses a java source file. This assumes the file is valid, so syntax errors
@@ -122,7 +124,7 @@ public class JavaParser
 				{
 					tokenizer.append(ch);
 					TokenInfo tokenInfo = getToken(tokenizer, reader);
-					String token = tokenInfo.token;
+					String token = tokenInfo.getToken();
 
 					// process token
 					processToken(token, reader);
@@ -426,19 +428,19 @@ public class JavaParser
 					tokenizer.append(ch);
 					TokenInfo tokenInfo = getToken(tokenizer, reader);
 
-					if(tokenInfo.lastChar == '(')
+					if(tokenInfo.getChar() == '(')
 					{
-						if(tokenInfo.token.equals(
+						if(tokenInfo.getToken().equals(
 								m_fileToken.getClassToken().getClassName()))
 						{
-							processConstructor(tokenInfo.token, reader);
+							processConstructor(tokenInfo.getToken(), reader);
 						}
 						else
 						{
-							processMethod(tokenInfo.token, reader);
+							processMethod(tokenInfo.getToken(), reader);
 						}
 					}
-					else if(tokenInfo.lastChar == ';') // an attribute was found
+					else if(tokenInfo.getChar() == ';') // an attribute was found
 					{
 						// clear the stack, want to start fresh after the
 						// attribute.
@@ -447,7 +449,7 @@ public class JavaParser
 					else
 					{
 						// process token
-						processToken(tokenInfo.token, reader);
+						processToken(tokenInfo.getToken(), reader);
 					}
 				}
 
@@ -648,24 +650,24 @@ public class JavaParser
 					tokenizer.append(ch);
 					TokenInfo tokenInfo = getToken(tokenizer, reader);
 
-					if(tokenInfo.lastChar == '(')
+					if(tokenInfo.getChar() == '(')
 					{
-						if(tokenInfo.token.startsWith("@"))
+						if(tokenInfo.getToken().startsWith("@"))
 						{
 							// eat it
 							eatAttribute(reader);
 						}
-						else if(tokenInfo.token.equals(
+						else if(tokenInfo.getToken().equals(
 								m_fileToken.getClassToken().getClassName()))
 						{
-							processConstructor(tokenInfo.token, reader);
+							processConstructor(tokenInfo.getToken(), reader);
 						}						
 						else
 						{
-							processMethod(tokenInfo.token, reader);
+							processMethod(tokenInfo.getToken(), reader);
 						}
 					}
-					else if(tokenInfo.lastChar == ';') // an attribute was found
+					else if(tokenInfo.getChar() == ';') // an attribute was found
 					{
 						// clear the stack, want to start fresh after the
 						// attribute.
@@ -674,7 +676,7 @@ public class JavaParser
 					else
 					{
 						// process token
-						processToken(tokenInfo.token, reader);
+						processToken(tokenInfo.getToken(), reader);
 					}
 				}
 
@@ -834,13 +836,18 @@ public class JavaParser
 					if(ch == '<')
 					{
 						tokenizer.append(ch);
+						getGenerics(tokenizer, reader);
+						token = tokenizer.toString();
+						// push onto the parameter list
+						m_parameterStack.push(token);
+						tokenizer = new StringBuilder();
 					}
 					else
 					{
-						if(ch == '>')
-						{
-							tokenizer.append(ch);
-						}
+//						if(ch == '>')
+//						{
+//							tokenizer.append(ch);
+//						}
 
 						token = tokenizer.toString();
 						// push onto the parameter list
@@ -848,6 +855,50 @@ public class JavaParser
 						tokenizer = new StringBuilder();
 					}
 				}
+			}
+		}
+	}
+	
+	/**
+	 * Encountered an opening < so keep building string until closing > is found.
+	 * Any embedded opening < angle brackets and their corresponding closing > angle bracket are included
+	 * in the processing.
+	 * @param tokenizer StringBuilder to keep appending to
+	 * @param reader Buffered reader to read
+	 * @throws IOException 
+	 */
+	private void getGenerics(StringBuilder tokenizer, BufferedReader reader) throws IOException
+	{
+		Stack<Character> angleBrackets = new Stack<Character>();
+		angleBrackets.push('<'); // got here because we encountered on
+		char ch = 0;
+		boolean fDone = false;
+		while(!fDone)
+		{
+			ch = (char)reader.read();
+			if(ch == -1)
+			{
+				fDone = true;
+				trace("  *** Unexpectedly reached end of file in getGenerics methd *** ");
+			}
+			else if( ch == '>')
+			{
+				angleBrackets.pop(); // reached a closing angle bracket
+				tokenizer.append(ch); // still need to append it.
+			}
+			else if(ch == '<')
+			{
+				// found an embedded open angle bracket
+				angleBrackets.push(ch);
+			}
+			else
+			{
+				tokenizer.append(ch);
+			}
+			
+			if(angleBrackets.size() == 0)
+			{
+				fDone = true;
 			}
 		}
 	}
@@ -862,6 +913,8 @@ public class JavaParser
 	 */
 	private void eatBody(BufferedReader reader) throws IOException
 	{
+		m_visibilityStack.clear();
+		
 		char ch = (char)-1;
 		Stack<String> braceStack = new Stack<String>();
 		braceStack.push("{"); // initialize to the brace that started it all
@@ -891,10 +944,10 @@ public class JavaParser
 				? new CommentToken("") : m_currentCommentToken;
 		StringBuilder tokenizer = new StringBuilder();
 		TokenInfo tokenInfo = getToken(tokenizer, reader);
-		String className = tokenInfo.token;
+		String className = tokenInfo.getToken();
 		ClassToken classToken = new ClassToken(className, commentToken);
 
-		if(tokenInfo.lastChar == '{')
+		if(tokenInfo.getChar() == '{')
 		{
 			// need to possibly change processing state
 			switch(m_curState)
@@ -939,7 +992,7 @@ public class JavaParser
 	private void getPackageToken(BufferedReader reader) throws IOException
 	{
 		StringBuilder tokenizer = new StringBuilder();
-		String packageName = getToken(tokenizer, reader).token;
+		String packageName = getToken(tokenizer, reader).getToken();
 
 		PackageToken token = new PackageToken(packageName);
 		m_fileToken.setPackageToken(token);
@@ -1160,17 +1213,17 @@ public class JavaParser
 	boolean m_suppressTrace;
 }
 
-class TokenInfo
-{
-	TokenInfo(String token, char last)
-	{
-		this.token = token;
-		lastChar = last;
-	}
-
-	String token;
-	char lastChar;
-}
+//class TokenInfo
+//{
+//	TokenInfo(String token, char last)
+//	{
+//		this.token = token;
+//		lastChar = last;
+//	}
+//
+//	String token;
+//	char lastChar;
+//}
 
 /**
  * Manages a two character string. When a character is added, the right position
@@ -1180,40 +1233,40 @@ class TokenInfo
  * 
  * @author Scott LaChance
  */
-class TwoCharString
-{
-	TwoCharString()
-	{
-		m_chars = new char[2];
-		m_length = 0;
-	}
-
-	public void addChar(char ch)
-	{
-		switch(m_length)
-		{
-			case 0:
-				m_chars[0] = ch;
-				m_length = 1;
-				break;
-			case 1:
-				m_chars[1] = ch;
-				m_length = 2;
-				break;
-			case 2:
-				m_chars[0] = m_chars[1];
-				m_chars[1] = ch;
-				break;
-		}
-	}
-
-	@Override
-	public String toString()
-	{
-		// TODO Auto-generated method stub
-		return new String(m_chars);
-	}
-
-	private char[] m_chars;
-	private int m_length = 0;
-}
+//class TwoCharString
+//{
+//	TwoCharString()
+//	{
+//		m_chars = new char[2];
+//		m_length = 0;
+//	}
+//
+//	public void addChar(char ch)
+//	{
+//		switch(m_length)
+//		{
+//			case 0:
+//				m_chars[0] = ch;
+//				m_length = 1;
+//				break;
+//			case 1:
+//				m_chars[1] = ch;
+//				m_length = 2;
+//				break;
+//			case 2:
+//				m_chars[0] = m_chars[1];
+//				m_chars[1] = ch;
+//				break;
+//		}
+//	}
+//
+//	@Override
+//	public String toString()
+//	{
+//		// TODO Auto-generated method stub
+//		return new String(m_chars);
+//	}
+//
+//	private char[] m_chars;
+//	private int m_length = 0;
+//}

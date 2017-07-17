@@ -96,6 +96,20 @@ public class ClassToken
 	 *            The name of the method to locate
 	 * @return MethodToken reference
 	 */
+	public MethodToken findMethodTokenByName(String methodName, String paramTypes)
+	{
+		MethodToken testData = m_map.get(methodName + paramTypes);
+
+		return testData;
+	}
+
+	/**
+	 * Retrieves a MethodToken by name
+	 * 
+	 * @param methodName
+	 *            The name of the method to locate
+	 * @return MethodToken reference
+	 */
 	public ConstructorToken findConstructorTokenByName(String methodName,
 			int paramCount)
 	{
@@ -154,9 +168,9 @@ public class ClassToken
 	private void mapMethods()
 	{
 		m_map.clear(); // reset
-		for(MethodToken test : m_methods)
+		for(MethodToken method : m_methods)
 		{
-			m_map.put(test.getName() + test.getParameters().size(), test);
+			m_map.put(method.getName() + method.getParameters().size(), method);
 		}
 	}
 
